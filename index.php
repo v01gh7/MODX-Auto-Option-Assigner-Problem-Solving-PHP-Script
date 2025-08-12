@@ -30,53 +30,60 @@ function extractResultsFromQueryObject($sqlQueryResult, $itemsToRetreive, $multi
 $prepareSqlQueryOfRetreiveCategories = prepareSqlQuery('SELECT modx_site_content.id FROM `modx_site_content` WHERE modx_site_content.class_key = "msCategory"');
 $categoriesIds = extractResultsFromQueryObject($prepareSqlQueryOfRetreiveCategories, array('id'));
 
-if(count($categoriesIds) > 0){
-
-	foreach($categoriesIds as $categoryId){
-
-		$productsQueryObject = prepareSqlQuery('SELECT modx_site_content.id FROM `modx_site_content` WHERE modx_site_content.class_key = "msProduct" AND modx_site_content.parent = "'.$categoryId.'"');
-		$productsIds = extractResultsFromQueryObject($productsQueryObject, array('id'));
-
-		if(count($productsIds) > 0){
-			$productsIds = implode(",", $productsIds);
-
-			$distinctProductOptionsSqlQuery = prepareSqlQuery('SELECT DISTINCT modx_ms2_product_options.key FROM `modx_ms2_product_options` WHERE modx_ms2_product_options.product_id IN ('.$productsIds.")");
-			$distinctProductOptions = extractResultsFromQueryObject($distinctProductOptionsSqlQuery, array('key'));
-
-			$uniqueOptions = "";
-			$uniqueOptionsLength = count($distinctProductOptions);
-			foreach ($distinctProductOptions as $idx => $value) {
-				if($idx >= $uniqueOptionsLength - 1){
-					$uniqueOptions .= "'$value'";
-				} else{
-					$uniqueOptions .= "'$value',";
-				}
-			}
+if(count($categoriesIds) <= 0){
+	return 'Have no categories';
+}
 
 
-			$uniqueOptionsIdsSqlQuery = prepareSqlQuery('SELECT modx_ms2_options.id,modx_ms2_options.key FROM `modx_ms2_options` WHERE modx_ms2_options.key IN ('.$uniqueOptions.')');
-			$uniqueOptionsIds = extractResultsFromQueryObject($uniqueOptionsIdsSqlQuery, array('id'));
+foreach($categoriesIds as $categoryId){
 
+	$productsQueryObject = prepareSqlQuery('SELECT modx_site_content.id FROM `modx_site_content` WHERE modx_site_content.class_key = "msProduct" AND modx_site_content.parent = "'.$categoryId.'"');
+	$productsIds = extractResultsFromQueryObject($productsQueryObject, array('id'));
 
-			/* #################################### ##################################### */
-			foreach($uniqueOptionsIds as $idx => $uniqueOptionId){
-				if (!$cop = $modx->getObject('msCategoryOption', array('option_id' => $uniqueOptionId, 'category_id' => $categoryId))) {
-					$table = $modx->getTableName('msCategoryOption');
-					$sql = "INSERT INTO {$table} (`option_id`,`category_id`,`active`) VALUES ({$uniqueOptionId}, {$categoryId}, 1);";
-					$stmt = $modx->prepare($sql);
-					$stmt->execute();
-				} else {
-					$q = $modx->newQuery('msCategoryOption');
-					$q->command('UPDATE');
-					$q->where(array('option_id' => $uniqueOptionId, 'category_id' => $categoryId));
-					$q->set(array('active' => 1));
-					$q->prepare();
-					$q->stmt->execute();
-				}            
-				
-			}
-			/* #################################### ##################################### */
-			echo 'Done';
+	if(count($productsIds) <= 0) continue;
+
+	$productsIds = implode(",", $productsIds);
+
+	$distinctProductOptionsSqlQuery = prepareSqlQuery('SELECT DISTINCT modx_ms2_product_options.key FROM `modx_ms2_product_options` WHERE modx_ms2_product_options.product_id IN ('.$productsIds.")");
+	$distinctProductOptions = extractResultsFromQueryObject($distinctProductOptionsSqlQuery, array('key'));
+
+	if(count($distinctProductOptions) <= 0) continue;
+
+	$uniqueOptions = "";
+	$uniqueOptionsLength = count($distinctProductOptions);
+	foreach ($distinctProductOptions as $idx => $value) {
+		if($idx >= $uniqueOptionsLength - 1){
+			$uniqueOptions .= "'$value'";
+		} else{
+			$uniqueOptions .= "'$value',";
 		}
 	}
+
+
+	$uniqueOptionsIdsSqlQuery = prepareSqlQuery('SELECT modx_ms2_options.id,modx_ms2_options.key FROM `modx_ms2_options` WHERE modx_ms2_options.key IN ('.$uniqueOptions.')');
+	$uniqueOptionsIds = extractResultsFromQueryObject($uniqueOptionsIdsSqlQuery, array('id'));
+
+	if(count($uniqueOptionsIds) <= 0) continue;
+
+	/* #################################### ##################################### */
+	foreach($uniqueOptionsIds as $idx => $uniqueOptionId){
+		if (!$cop = $modx->getObject('msCategoryOption', array('option_id' => $uniqueOptionId, 'category_id' => $categoryId))) {
+			$table = $modx->getTableName('msCategoryOption');
+			$sql = "INSERT INTO {$table} (`option_id`,`category_id`,`active`) VALUES ({$uniqueOptionId}, {$categoryId}, 1);";
+			$stmt = $modx->prepare($sql);
+			$stmt->execute();
+		} else {
+			$q = $modx->newQuery('msCategoryOption');
+			$q->command('UPDATE');
+			$q->where(array('option_id' => $uniqueOptionId, 'category_id' => $categoryId));
+			$q->set(array('active' => 1));
+			$q->prepare();
+			$q->stmt->execute();
+		}            
+		
+	}
+	/* #################################### ##################################### */
+
+	echo 'Done';
+
 }
